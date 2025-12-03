@@ -1,0 +1,19 @@
+{
+  "name": "@ys319/fuzzy-search",
+  "version": "1.0.0",
+  "exports": "./mod.ts",
+  "tasks": {
+    "test": "deno test --allow-read",
+    "bench": "deno bench --allow-hrtime",
+    "check": "deno check mod.ts"
+  },
+  "publish": {
+    "exclude": [
+      "bench/"
+    ]
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1",
+    "fast-check": "npm:fast-check@^4.3.0"
+  }
+}
