@@ -58,7 +58,7 @@ const search100 = new FuzzySearch<BenchProduct>({
     "name",
     "category",
     "manufacturer",
-  ]
+  ],
 });
 search100.addAll(products100);
 
@@ -67,7 +67,7 @@ const search1000 = new FuzzySearch<BenchProduct>({
     "name",
     "category",
     "manufacturer",
-  ]
+  ],
 });
 search1000.addAll(products1000);
 
@@ -76,7 +76,7 @@ const search10000 = new FuzzySearch<BenchProduct>({
     "name",
     "category",
     "manufacturer",
-  ]
+  ],
 });
 search10000.addAll(products10000);
 
@@ -90,7 +90,7 @@ Deno.bench("Index building - 100 items", () => {
       "name",
       "category",
       "manufacturer",
-    ]
+    ],
   });
   search.addAll(products100);
 });
@@ -101,7 +101,7 @@ Deno.bench("Index building - 1,000 items", () => {
       "name",
       "category",
       "manufacturer",
-    ]
+    ],
   });
   search.addAll(products1000);
 });
@@ -112,7 +112,7 @@ Deno.bench("Index building - 10,000 items", () => {
       "name",
       "category",
       "manufacturer",
-    ]
+    ],
   });
   search.addAll(products10000);
 });

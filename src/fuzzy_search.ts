@@ -1,4 +1,10 @@
-import type { AlgorithmType, FuzzySearchOptions, OptimizationOptions, SearchOptions, SearchResult } from "./types.ts";
+import type {
+  AlgorithmType,
+  FuzzySearchOptions,
+  OptimizationOptions,
+  SearchOptions,
+  SearchResult,
+} from "./types.ts";
 import type { SearchAlgorithm } from "./algorithms/types.ts";
 import { LevenshteinAlgorithm } from "./algorithms/levenshtein.ts";
 import { DamerauLevenshteinAlgorithm } from "./algorithms/damerau_levenshtein.ts";
@@ -6,7 +12,7 @@ import { SmithWatermanAlgorithm } from "./algorithms/smith_waterman.ts";
 import { JaroWinklerAlgorithm } from "./algorithms/jaro_winkler.ts";
 import { NeedlemanWunschAlgorithm } from "./algorithms/needleman_wunsch.ts";
 import { HammingAlgorithm } from "./algorithms/hamming.ts";
-import { normalize, extractText } from "./utils/text.ts";
+import { extractText, normalize } from "./utils/text.ts";
 import { computeSignature } from "./utils/signature.ts";
 import { CharacterIndex } from "./utils/character_index.ts";
 
@@ -64,8 +70,10 @@ export class FuzzySearch<T> {
     this.optimizations = {
       useBitap: options.optimizations?.useBitap ?? true,
       useSignatureFilter: options.optimizations?.useSignatureFilter ?? true,
-      useTwoStageEvaluation: options.optimizations?.useTwoStageEvaluation ?? true,
-      usePrefixSuffixTrimming: options.optimizations?.usePrefixSuffixTrimming ?? true,
+      useTwoStageEvaluation: options.optimizations?.useTwoStageEvaluation ??
+        true,
+      usePrefixSuffixTrimming: options.optimizations?.usePrefixSuffixTrimming ??
+        true,
       useEarlyExactMatch: options.optimizations?.useEarlyExactMatch ?? true,
     };
 
@@ -236,7 +244,9 @@ export class FuzzySearch<T> {
      * Helper function to calculate combined score from multiple algorithms.
      */
     const calculateCombinedScore = (text: string): number => {
-      const scores = searchAlgos.map((algo) => algo.score(normalizedQuery, text));
+      const scores = searchAlgos.map((algo) =>
+        algo.score(normalizedQuery, text)
+      );
       if (strategy === "average") {
         return scores.reduce((sum, score) => sum + score, 0) / scores.length;
       } else {
@@ -345,8 +355,9 @@ export class FuzzySearch<T> {
     }
 
     // Build character-based index
-    this.characterIndex.buildIndex(this.items, (item) =>
-      extractText(item, this.searchKeys)
+    this.characterIndex.buildIndex(
+      this.items,
+      (item) => extractText(item, this.searchKeys),
     );
   }
 }

@@ -30,11 +30,11 @@
 // Core exports
 export { FuzzySearch } from "./src/fuzzy_search.ts";
 export type {
-    AlgorithmType,
-    FuzzySearchOptions,
-    OptimizationOptions,
-    SearchOptions,
-    SearchResult,
+  AlgorithmType,
+  FuzzySearchOptions,
+  OptimizationOptions,
+  SearchOptions,
+  SearchResult,
 } from "./src/types.ts";
 
 // Preset exports

@@ -12,7 +12,7 @@ export type AlgorithmType =
 /**
  * Configuration options for FuzzySearch constructor.
  */
-export interface FuzzySearchOptions<T> {
+export type FuzzySearchOptions<T> = {
   /**
    * Keys to search across in the objects.
    */
@@ -26,18 +26,18 @@ export interface FuzzySearchOptions<T> {
 
   /**
    * Algorithm(s) to use for scoring.
-   * 
+   *
    * Can be a single algorithm or an array of algorithms.
    * When multiple algorithms are specified, each candidate is scored by all algorithms,
    * and the final score is determined by the `algorithmStrategy`.
-   * 
+   *
    * - "levenshtein": General purpose, good for typos and edits
    * - "damerau-levenshtein": Better for adjacent character swaps (e.g., "teh" vs "the")
    * - "smith-waterman": Better for partial matching and substring search (DEFAULT)
    * - "jaro-winkler": Better for short strings and prefix matching (e.g., names)
    * - "needleman-wunsch": Global alignment, good for similar-length strings
    * - "hamming": Fastest (O(n)), only for equal-length strings (e.g., codes)
-   * 
+   *
    * @default "smith-waterman"
    * @example ["smith-waterman", "damerau-levenshtein"] // Hybrid: partial match + transposition
    */
@@ -45,10 +45,10 @@ export interface FuzzySearchOptions<T> {
 
   /**
    * Strategy for combining scores when multiple algorithms are used.
-   * 
+   *
    * - "min": Use the best (minimum) score from all algorithms (default)
    * - "average": Use the average score from all algorithms
-   * 
+   *
    * @default "min"
    */
   algorithmStrategy?: "min" | "average";
@@ -57,7 +57,7 @@ export interface FuzzySearchOptions<T> {
    * Optimization options to control performance vs. accuracy trade-offs.
    */
   optimizations?: OptimizationOptions;
-}
+};
 
 /**
  * Options for controlling search behavior.
@@ -87,12 +87,12 @@ export type SearchOptions = {
    * @default "levenshtein"
    */
   algorithm?:
-  | "levenshtein"
-  | "damerau-levenshtein"
-  | "smith-waterman"
-  | "jaro-winkler"
-  | "needleman-wunsch"
-  | "hamming";
+    | "levenshtein"
+    | "damerau-levenshtein"
+    | "smith-waterman"
+    | "jaro-winkler"
+    | "needleman-wunsch"
+    | "hamming";
 };
 
 /**
@@ -103,7 +103,7 @@ export type SearchOptions = {
  * All optimizations are enabled by default for maximum performance.
  * Disable individual optimizations to measure their impact or for debugging.
  */
-export interface OptimizationOptions {
+export type OptimizationOptions = {
   /**
    * Use Bitap algorithm for fast Levenshtein distance calculation on short patterns (≤32 chars).
    * Provides significant speedup for short strings using bit-parallel operations.
@@ -138,7 +138,7 @@ export interface OptimizationOptions {
    * @default true
    */
   useEarlyExactMatch?: boolean;
-}
+};
 
 /**
  * A single search result with the matched item and its similarity score.

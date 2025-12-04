@@ -15,7 +15,9 @@ const products: Product[] = [
 ];
 
 // Search across multiple fields
-const search = new FuzzySearch<Product>({ keys: ["name", "category", "manufacturer"] });
+const search = new FuzzySearch<Product>({
+  keys: ["name", "category", "manufacturer"],
+});
 search.addAll(products);
 
 // Finds matches in any of the specified fields

@@ -5,7 +5,7 @@
  * @returns The normalized text.
  */
 export function normalize(text: string): string {
-    return text.toLowerCase();
+  return text.toLowerCase();
 }
 
 /**
@@ -16,8 +16,8 @@ export function normalize(text: string): string {
  * @returns The combined normalized text.
  */
 export function extractText<T>(item: T, keys: (keyof T)[]): string {
-    return keys
-        .map((key) => String(item[key] ?? ""))
-        .join(" ")
-        .toLowerCase();
+  return keys
+    .map((key) => String(item[key] ?? ""))
+    .join(" ")
+    .toLowerCase();
 }
