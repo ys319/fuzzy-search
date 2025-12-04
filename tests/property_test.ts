@@ -14,8 +14,7 @@ Deno.test("FuzzySearch - Property Based Testing", async (t) => {
         fc.string(),
         (items, query) => {
           const search = new FuzzySearch(
-            ["id", "text", "tags"],
-            { ngramSize: 2 },
+            { keys: ["id", "text", "tags"] },
           );
           search.addAll(items);
 
@@ -32,7 +31,7 @@ Deno.test("FuzzySearch - Property Based Testing", async (t) => {
         fc.array(fc.record({ text: fc.string() })),
         fc.string(),
         (items, query) => {
-          const search = new FuzzySearch(["text"]);
+          const search = new FuzzySearch({ keys: ["text"] });
           search.addAll(items);
           const results = search.search(query, { threshold: 1.0 });
 
@@ -57,7 +56,7 @@ Deno.test("FuzzySearch - Property Based Testing", async (t) => {
             minLength: 1,
           }),
           (items) => {
-            const search = new FuzzySearch(["text"]);
+            const search = new FuzzySearch({ keys: ["text"] });
             search.addAll(items);
 
             // Pick a random item to search for
@@ -91,7 +90,7 @@ Deno.test("FuzzySearch - Property Based Testing", async (t) => {
         fc.string(),
         fc.float({ min: 0, max: 1 }),
         (items, query, threshold) => {
-          const search = new FuzzySearch(["text"]);
+          const search = new FuzzySearch({ keys: ["text"] });
           search.addAll(items);
           const results = search.search(query, { threshold });
 

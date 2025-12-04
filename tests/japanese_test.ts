@@ -15,7 +15,7 @@ Deno.test("Japanese - basic search", () => {
     { name: "トマト", category: "野菜" },
   ];
 
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(products);
 
   const results = search.search("りんご");
@@ -36,7 +36,7 @@ Deno.test("Japanese - substring search", () => {
     { title: "京都駅" },
   ];
 
-  const search = new FuzzySearch<JapaneseData>(["title"]);
+  const search = new FuzzySearch<JapaneseData>({ keys: ["title"] });
   search.addAll(data);
 
   const results = search.search("東京", { threshold: 0.5 });
@@ -59,7 +59,7 @@ Deno.test("Japanese - single character query", () => {
     { title: "京都駅" },
   ];
 
-  const search = new FuzzySearch<JapaneseData>(["title"]);
+  const search = new FuzzySearch<JapaneseData>({ keys: ["title"] });
   search.addAll(data);
 
   // "京" should find all items containing that character
@@ -82,7 +82,7 @@ Deno.test("Japanese - multi-byte character handling", () => {
     { text: "ありがとう" },
   ];
 
-  const search = new FuzzySearch<TestData>(["text"]);
+  const search = new FuzzySearch<TestData>({ keys: ["text"] });
   search.addAll(data);
 
   // Test that multi-byte characters are handled correctly
@@ -103,7 +103,7 @@ Deno.test("Japanese - mixed hiragana and katakana", () => {
     { text: "そふとうぇあ" },
   ];
 
-  const search = new FuzzySearch<MixedData>(["text"]);
+  const search = new FuzzySearch<MixedData>({ keys: ["text"] });
   search.addAll(data);
 
   // Katakana query should find katakana items
@@ -117,7 +117,7 @@ Deno.test("Japanese - mixed hiragana and katakana", () => {
   assertEquals(results2[0].item.text, "こんぴゅーた");
 });
 
-Deno.test("Japanese - bigram effectiveness", () => {
+Deno.test("Japanese - partial match", () => {
   interface TestProduct {
     name: string;
   }
@@ -128,11 +128,11 @@ Deno.test("Japanese - bigram effectiveness", () => {
     { name: "バナナ" },
   ];
 
-  const search = new FuzzySearch<TestProduct>(["name"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name"] });
   search.addAll(products);
 
-  // Bigram (n=2) should work well with Japanese
-  const bigramResults = search.search("りん", { ngramSize: 2, threshold: 0.5 });
-  assertEquals(bigramResults.length >= 1, true);
-  assertEquals(bigramResults[0].item.name, "りんご");
+  // Partial match should work well with Japanese
+  const results = search.search("りん", { threshold: 0.5 });
+  assertEquals(results.length >= 1, true);
+  assertEquals(results[0].item.name, "りんご");
 });

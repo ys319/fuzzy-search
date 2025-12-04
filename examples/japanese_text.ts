@@ -10,7 +10,7 @@ const articles: Article[] = [
   { title: "大阪城" },
 ];
 
-const search = new FuzzySearch<Article>(["title"]);
+const search = new FuzzySearch<Article>({ keys: ["title"] });
 search.addAll(articles);
 
 const results = search.search("東京", { threshold: 0.5 });

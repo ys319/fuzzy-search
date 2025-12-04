@@ -16,47 +16,14 @@ const movies: Movie[] = [
   { title: "Forrest Gump", genre: "Drama" },
 ];
 
-const search = new FuzzySearch<Movie>(["title", "genre"]);
+const search = new FuzzySearch<Movie>({ keys: ["title", "genre"] });
 search.addAll(movies);
-
-// ============================================================================
-// Bigram (n=2) vs Trigram (n=3)
-// ============================================================================
-
-console.log("=== Bigram vs Trigram ===\n");
-
-// Bigram (default) - Better recall for short queries
-console.log("Searching for 'Mat' with Bigram (n=2):");
-const bigramResults = search.search("Mat", { ngramSize: 2, threshold: 0.5 });
-console.log(
-  bigramResults.map((r) => ({
-    title: r.item.title,
-    score: r.score.toFixed(2),
-  })),
-);
-console.log(`Found ${bigramResults.length} results\n`);
-
-// Trigram - More precise, but may miss short queries
-console.log("Searching for 'Mat' with Trigram (n=3):");
-const trigramResults = search.search("Mat", { ngramSize: 3, threshold: 0.5 });
-console.log(
-  trigramResults.map((r) => ({
-    title: r.item.title,
-    score: r.score.toFixed(2),
-  })),
-);
-console.log(`Found ${trigramResults.length} results\n`);
-
-console.log("Note: Bigram has better recall for short queries like 'Mat'.");
-console.log(
-  "Trigram is faster but may miss matches when query is very short.\n",
-);
 
 // ============================================================================
 // Threshold Tuning
 // ============================================================================
 
-console.log("\n=== Threshold Tuning ===\n");
+console.log("=== Threshold Tuning ===\n");
 
 // Strict threshold - only very similar results
 console.log("Searching for 'Matrx' (typo) with strict threshold (0.2):");
@@ -69,9 +36,20 @@ console.log(
 );
 console.log(`Found ${strictResults.length} results\n`);
 
+// Medium threshold
+console.log("Searching for 'Matrx' (typo) with medium threshold (0.4):");
+const mediumResults = search.search("Matrx", { threshold: 0.4 });
+console.log(
+  mediumResults.map((r) => ({
+    title: r.item.title,
+    score: r.score.toFixed(2),
+  })),
+);
+console.log(`Found ${mediumResults.length} results\n`);
+
 // Relaxed threshold - more permissive
-console.log("Searching for 'Matrx' (typo) with relaxed threshold (0.5):");
-const relaxedResults = search.search("Matrx", { threshold: 0.5 });
+console.log("Searching for 'Matrx' (typo) with relaxed threshold (0.6):");
+const relaxedResults = search.search("Matrx", { threshold: 0.6 });
 console.log(
   relaxedResults.map((r) => ({
     title: r.item.title,
@@ -83,4 +61,59 @@ console.log(`Found ${relaxedResults.length} results\n`);
 console.log("Note: Higher threshold = more lenient matching (more results).");
 console.log(
   "Lower threshold = stricter matching (fewer, more accurate results).",
+);
+
+// ============================================================================
+// Algorithm Selection
+// ============================================================================
+
+console.log("\n\n=== Algorithm Selection ===\n");
+
+// Levenshtein - General purpose
+const levenshteinSearch = new FuzzySearch<Movie>({
+  keys: ["title", "genre"],
+  algorithm: "levenshtein",
+});
+levenshteinSearch.addAll(movies);
+
+console.log("Levenshtein (general purpose):");
+const levResults = levenshteinSearch.search("Matrix", { threshold: 0.4 });
+console.log(
+  levResults.map((r) => ({
+    title: r.item.title,
+    score: r.score.toFixed(2),
+  })),
+);
+
+// Smith-Waterman - Better for partial matches
+const swSearch = new FuzzySearch<Movie>({
+  keys: ["title", "genre"],
+  algorithm: "smith-waterman",
+});
+swSearch.addAll(movies);
+
+console.log("\nSmith-Waterman (partial matching):");
+const swResults = swSearch.search("Matrix", { threshold: 0.4 });
+console.log(
+  swResults.map((r) => ({
+    title: r.item.title,
+    score: r.score.toFixed(2),
+  })),
+);
+
+// Damerau-Levenshtein - Better for transpositions
+const dlSearch = new FuzzySearch<Movie>({
+  keys: ["title", "genre"],
+  algorithm: "damerau-levenshtein",
+});
+dlSearch.addAll(movies);
+
+console.log("\nDamerau-Levenshtein (transposition-friendly):");
+console.log("Searching for 'teh' (transposed 'the'):");
+const dlResults = dlSearch.search("teh", { threshold: 0.6 });
+console.log(
+  dlResults.slice(0, 3).map((r) => ({
+    title: r.item.title,
+    score: r.score.toFixed(2),
+  })),
 );

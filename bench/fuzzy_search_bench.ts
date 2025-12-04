@@ -53,25 +53,31 @@ const products100 = generateProducts(100);
 const products1000 = generateProducts(1000);
 const products10000 = generateProducts(10000);
 
-const search100 = new FuzzySearch<BenchProduct>([
-  "name",
-  "category",
-  "manufacturer",
-]);
+const search100 = new FuzzySearch<BenchProduct>({
+  keys: [
+    "name",
+    "category",
+    "manufacturer",
+  ]
+});
 search100.addAll(products100);
 
-const search1000 = new FuzzySearch<BenchProduct>([
-  "name",
-  "category",
-  "manufacturer",
-]);
+const search1000 = new FuzzySearch<BenchProduct>({
+  keys: [
+    "name",
+    "category",
+    "manufacturer",
+  ]
+});
 search1000.addAll(products1000);
 
-const search10000 = new FuzzySearch<BenchProduct>([
-  "name",
-  "category",
-  "manufacturer",
-]);
+const search10000 = new FuzzySearch<BenchProduct>({
+  keys: [
+    "name",
+    "category",
+    "manufacturer",
+  ]
+});
 search10000.addAll(products10000);
 
 // ============================================================================
@@ -79,29 +85,35 @@ search10000.addAll(products10000);
 // ============================================================================
 
 Deno.bench("Index building - 100 items", () => {
-  const search = new FuzzySearch<BenchProduct>([
-    "name",
-    "category",
-    "manufacturer",
-  ]);
+  const search = new FuzzySearch<BenchProduct>({
+    keys: [
+      "name",
+      "category",
+      "manufacturer",
+    ]
+  });
   search.addAll(products100);
 });
 
 Deno.bench("Index building - 1,000 items", () => {
-  const search = new FuzzySearch<BenchProduct>([
-    "name",
-    "category",
-    "manufacturer",
-  ]);
+  const search = new FuzzySearch<BenchProduct>({
+    keys: [
+      "name",
+      "category",
+      "manufacturer",
+    ]
+  });
   search.addAll(products1000);
 });
 
 Deno.bench("Index building - 10,000 items", () => {
-  const search = new FuzzySearch<BenchProduct>([
-    "name",
-    "category",
-    "manufacturer",
-  ]);
+  const search = new FuzzySearch<BenchProduct>({
+    keys: [
+      "name",
+      "category",
+      "manufacturer",
+    ]
+  });
   search.addAll(products10000);
 });
 
@@ -130,15 +142,15 @@ Deno.bench("Search - 10,000 items (with typo)", () => {
 });
 
 // ============================================================================
-// N-GRAM SIZE COMPARISON
+// ALGORITHM COMPARISON
 // ============================================================================
 
-Deno.bench("Search - Bigram (n=2) on 1,000 items", () => {
-  search1000.search("Apple", { ngramSize: 2 });
+Deno.bench("Search - Smith-Waterman on 1,000 items", () => {
+  search1000.search("Apple", { algorithm: "smith-waterman" });
 });
 
-Deno.bench("Search - Trigram (n=3) on 1,000 items", () => {
-  search1000.search("Apple", { ngramSize: 3 });
+Deno.bench("Search - Levenshtein on 1,000 items", () => {
+  search1000.search("Apple", { algorithm: "levenshtein" });
 });
 
 // ============================================================================

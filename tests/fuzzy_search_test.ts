@@ -15,7 +15,7 @@ const testProducts: TestProduct[] = [
 ];
 
 Deno.test("FuzzySearch - exact match", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const results = search.search("Apple");
@@ -25,7 +25,7 @@ Deno.test("FuzzySearch - exact match", () => {
 });
 
 Deno.test("FuzzySearch - typo tolerance", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   // "Aple" instead of "Apple" - missing one letter
@@ -37,7 +37,7 @@ Deno.test("FuzzySearch - typo tolerance", () => {
 });
 
 Deno.test("FuzzySearch - search by category", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const results = search.search("Fruit");
@@ -49,7 +49,7 @@ Deno.test("FuzzySearch - search by category", () => {
 });
 
 Deno.test("FuzzySearch - threshold filtering", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const strictResults = search.search("Apple", { threshold: 0.1 });
@@ -60,7 +60,7 @@ Deno.test("FuzzySearch - threshold filtering", () => {
 });
 
 Deno.test("FuzzySearch - result limit", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const results = search.search("a", { limit: 2, threshold: 0.8 });
@@ -68,7 +68,7 @@ Deno.test("FuzzySearch - result limit", () => {
 });
 
 Deno.test("FuzzySearch - empty query", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const results = search.search("", { threshold: 0.1 });
@@ -76,7 +76,7 @@ Deno.test("FuzzySearch - empty query", () => {
 });
 
 Deno.test("FuzzySearch - no matches", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const results = search.search("ZZZZZZZZZ", { threshold: 0.1 });
@@ -84,7 +84,7 @@ Deno.test("FuzzySearch - no matches", () => {
 });
 
 Deno.test("FuzzySearch - multiple keys", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   // Should find match in category even if name doesn't match
@@ -94,7 +94,7 @@ Deno.test("FuzzySearch - multiple keys", () => {
 });
 
 Deno.test("FuzzySearch - case insensitive", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const upperResults = search.search("APPLE");
@@ -104,23 +104,22 @@ Deno.test("FuzzySearch - case insensitive", () => {
   assertEquals(upperResults[0].item.name, lowerResults[0].item.name);
 });
 
-Deno.test("FuzzySearch - bigram vs trigram", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+Deno.test("FuzzySearch - threshold variations", () => {
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
-  const bigramResults = search.search("App", { ngramSize: 2, threshold: 0.5 });
-  const trigramResults = search.search("App", {
-    ngramSize: 3,
-    threshold: 0.5,
-  });
+  const strictResults = search.search("App", { threshold: 0.3 });
+  const relaxedResults = search.search("App", { threshold: 0.6 });
 
-  // Both should find matches, bigram typically has higher recall
-  assertEquals(bigramResults.length >= 1, true);
-  assertEquals(trigramResults.length >= 1, true);
+  // Both should find matches
+  assertEquals(strictResults.length >= 1, true);
+  assertEquals(relaxedResults.length >= 1, true);
+  // Relaxed should have at least as many as strict
+  assertEquals(relaxedResults.length >= strictResults.length, true);
 });
 
 Deno.test("FuzzySearch - sorted by relevance", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll(testProducts);
 
   const results = search.search("Fruit", { threshold: 0.5 });
@@ -132,7 +131,7 @@ Deno.test("FuzzySearch - sorted by relevance", () => {
 });
 
 Deno.test("FuzzySearch - empty dataset", () => {
-  const search = new FuzzySearch<TestProduct>(["name", "category"]);
+  const search = new FuzzySearch<TestProduct>({ keys: ["name", "category"] });
   search.addAll([]);
 
   const results = search.search("test");
@@ -150,7 +149,7 @@ Deno.test("FuzzySearch - special characters", () => {
     { text: "C++ programming" },
   ];
 
-  const search = new FuzzySearch<SpecialData>(["text"]);
+  const search = new FuzzySearch<SpecialData>({ keys: ["text"] });
   search.addAll(data);
 
   const results = search.search("hello@world");
@@ -170,7 +169,7 @@ Deno.test("FuzzySearch - single character query", () => {
     { text: "banana" },
   ];
 
-  const search = new FuzzySearch<TestData>(["text"]);
+  const search = new FuzzySearch<TestData>({ keys: ["text"] });
   search.addAll(data);
 
   // "l" should find "apple" and "application"
@@ -194,7 +193,7 @@ Deno.test("FuzzySearch - single character edge cases", () => {
     { text: "xyz" },
   ];
 
-  const search = new FuzzySearch<TestData>(["text"]);
+  const search = new FuzzySearch<TestData>({ keys: ["text"] });
   search.addAll(data);
 
   // "a" should find items containing "a"
@@ -202,4 +201,60 @@ Deno.test("FuzzySearch - single character edge cases", () => {
   assertEquals(results.length >= 1, true); // At least "a" (exact match)
   // First result should be perfect match or substring match
   assertEquals(results[0].score, 0);
+});
+
+Deno.test("FuzzySearch - Smith-Waterman algorithm", () => {
+  interface TestData {
+    text: string;
+  }
+  const data: TestData[] = [
+    { text: "sato@gmail.com" },
+    { text: "suzuki@yahoo.co.jp" },
+    { text: "tanaka@outlook.com" },
+  ];
+
+  const search = new FuzzySearch<TestData>({
+    keys: ["text"],
+    algorithm: "smith-waterman",
+  });
+  search.addAll(data);
+
+  // "gma" should match "gmail" very well with Smith-Waterman (substring match)
+  const results = search.search("gma", { threshold: 0.1 });
+  assertEquals(results.length >= 1, true);
+  assertEquals(results[0].item.text, "sato@gmail.com");
+
+  // Smith-Waterman should handle partial matches better than Levenshtein
+  // "look" in "outlook"
+  const results2 = search.search("look", { threshold: 0.1 });
+  assertEquals(results2.length >= 1, true);
+  assertEquals(results2[0].item.text, "tanaka@outlook.com");
+});
+
+Deno.test("FuzzySearch - Character signature filter", () => {
+  interface TestData {
+    text: string;
+  }
+  // Create a large dataset to ensure filter is actually used (though hard to verify internally without mocking)
+  // But we can verify correctness: items that DON'T share chars should NOT be returned.
+  const data: TestData[] = [
+    { text: "apple" },
+    { text: "banana" },
+    { text: "cherry" },
+  ];
+
+  const search = new FuzzySearch<TestData>({ keys: ["text"] });
+  search.addAll(data);
+
+  // "z" shares no characters with any item -> should return empty
+  const results = search.search("z", { threshold: 1.0 }); // High threshold to accept anything
+  assertEquals(results.length, 0);
+
+  // "a" shares with apple and banana
+  const results2 = search.search("a", { threshold: 1.0 });
+  assertEquals(results2.length >= 2, true);
+  const hasApple = results2.some((r) => r.item.text === "apple");
+  const hasBanana = results2.some((r) => r.item.text === "banana");
+  assertEquals(hasApple, true);
+  assertEquals(hasBanana, true);
 });

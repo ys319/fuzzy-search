@@ -13,7 +13,7 @@ const products: Product[] = [
 ];
 
 // Create search instance with keys to search
-const search = new FuzzySearch<Product>(["name", "category"]);
+const search = new FuzzySearch<Product>({ keys: ["name", "category"] });
 
 // Build index
 search.addAll(products);
