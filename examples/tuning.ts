@@ -1,4 +1,4 @@
-import { FuzzySearch } from "../mod.ts";
+import { FuzzySearch, strategies } from "../mod.ts";
 
 interface Movie {
   title: string;
@@ -16,7 +16,10 @@ const movies: Movie[] = [
   { title: "Forrest Gump", genre: "Drama" },
 ];
 
-const search = new FuzzySearch<Movie>({ keys: ["title", "genre"] });
+const search = new FuzzySearch<Movie>({
+  keys: ["title", "genre"],
+  strategy: strategies.Hybrid,
+});
 search.addAll(movies);
 
 // ============================================================================
@@ -85,14 +88,14 @@ console.log(
   })),
 );
 
-// Smith-Waterman - Better for partial matches
+// Smith-Waterman - Better for partial matches (FullText Strategy)
 const swSearch = new FuzzySearch<Movie>({
   keys: ["title", "genre"],
-  algorithm: "smith-waterman",
+  strategy: strategies.FullText,
 });
 swSearch.addAll(movies);
 
-console.log("\nSmith-Waterman (partial matching):");
+console.log("\nSmith-Waterman (FullText Strategy - partial matching):");
 const swResults = swSearch.search("Matrix", { threshold: 0.4 });
 console.log(
   swResults.map((r) => ({
@@ -101,14 +104,14 @@ console.log(
   })),
 );
 
-// Damerau-Levenshtein - Better for transpositions
+// Damerau-Levenshtein - Better for transpositions (Correction Strategy)
 const dlSearch = new FuzzySearch<Movie>({
   keys: ["title", "genre"],
-  algorithm: "damerau-levenshtein",
+  strategy: strategies.Correction,
 });
 dlSearch.addAll(movies);
 
-console.log("\nDamerau-Levenshtein (transposition-friendly):");
+console.log("\nDamerau-Levenshtein (Correction Strategy - transposition-friendly):");
 console.log("Searching for 'teh' (transposed 'the'):");
 const dlResults = dlSearch.search("teh", { threshold: 0.6 });
 console.log(

@@ -36,8 +36,8 @@ deno run examples/multi_field.ts
 
 Performance tuning examples including:
 
-- Bigram vs Trigram comparison
 - Threshold tuning for strict vs relaxed matching
+- Algorithm Selection (Levenshtein, FullText, Correction)
 
 ```bash
 deno run examples/tuning.ts

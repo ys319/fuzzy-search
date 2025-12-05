@@ -1,4 +1,4 @@
-import { FuzzySearch } from "../mod.ts";
+import { FuzzySearch, strategies } from "../mod.ts";
 
 interface Product {
   name: string;
@@ -12,8 +12,11 @@ const products: Product[] = [
   { name: "Carrot", category: "Vegetable" },
 ];
 
-// Create search instance with keys to search
-const search = new FuzzySearch<Product>({ keys: ["name", "category"] });
+// Create search instance with keys to search and Hybrid strategy
+const search = new FuzzySearch<Product>({
+  keys: ["name", "category"],
+  strategy: strategies.Hybrid,
+});
 
 // Build index
 search.addAll(products);

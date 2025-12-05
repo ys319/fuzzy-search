@@ -1,4 +1,4 @@
-import { FuzzySearch } from "../mod.ts";
+import { FuzzySearch, strategies } from "../mod.ts";
 
 interface Article {
   title: string;
@@ -10,7 +10,10 @@ const articles: Article[] = [
   { title: "大阪城" },
 ];
 
-const search = new FuzzySearch<Article>({ keys: ["title"] });
+const search = new FuzzySearch<Article>({
+  keys: ["title"],
+  strategy: strategies.Hybrid,
+});
 search.addAll(articles);
 
 const results = search.search("東京", { threshold: 0.5 });
