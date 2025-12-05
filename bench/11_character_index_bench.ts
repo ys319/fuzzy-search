@@ -12,17 +12,17 @@ const itemCount = 10_000;
 const products = generateProducts(itemCount);
 
 Deno.bench(`CharacterIndex | Build Index`, () => {
-    const charIndex = new CharacterIndex<Product>();
-    charIndex.buildIndex(products, (item) => `${item.name} ${item.category}`);
+  const charIndex = new CharacterIndex<Product>();
+  charIndex.buildIndex(products, (item) => `${item.name} ${item.category}`);
 });
 
 const charIndex = new CharacterIndex<Product>();
 charIndex.buildIndex(products, (item) => `${item.name} ${item.category}`);
 
 Deno.bench(`CharacterIndex | Find Candidates (Exact)`, () => {
-    charIndex.findCandidates("Apple");
+  charIndex.findCandidates("Apple");
 });
 
 Deno.bench(`CharacterIndex | Find Candidates (Typo)`, () => {
-    charIndex.findCandidates("Aple");
+  charIndex.findCandidates("Aple");
 });

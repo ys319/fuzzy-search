@@ -1,4 +1,10 @@
-import type { AlgorithmType, FuzzySearchOptions, OptimizationOptions, SearchOptions, SearchResult } from "./types.ts";
+import type {
+  AlgorithmType,
+  FuzzySearchOptions,
+  OptimizationOptions,
+  SearchOptions,
+  SearchResult,
+} from "./types.ts";
 import type { SearchAlgorithm } from "./algorithms/types.ts";
 import { LevenshteinAlgorithm } from "./algorithms/levenshtein.ts";
 import { DamerauLevenshteinAlgorithm } from "./algorithms/damerau_levenshtein.ts";

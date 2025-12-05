@@ -116,12 +116,12 @@ export type SearchOptions = {
    * @default "levenshtein"
    */
   algorithm?:
-  | "levenshtein"
-  | "damerau-levenshtein"
-  | "smith-waterman"
-  | "jaro-winkler"
-  | "needleman-wunsch"
-  | "hamming";
+    | "levenshtein"
+    | "damerau-levenshtein"
+    | "smith-waterman"
+    | "jaro-winkler"
+    | "needleman-wunsch"
+    | "hamming";
 };
 
 /**

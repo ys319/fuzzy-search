@@ -111,7 +111,9 @@ const dlSearch = new FuzzySearch<Movie>({
 });
 dlSearch.addAll(movies);
 
-console.log("\nDamerau-Levenshtein (Correction Strategy - transposition-friendly):");
+console.log(
+  "\nDamerau-Levenshtein (Correction Strategy - transposition-friendly):",
+);
 console.log("Searching for 'teh' (transposed 'the'):");
 const dlResults = dlSearch.search("teh", { threshold: 0.6 });
 console.log(

@@ -29,7 +29,13 @@
 
 // Core exports
 export { FuzzySearch } from "./src/fuzzy_search.ts";
-export type { AlgorithmType, FuzzySearchOptions, OptimizationOptions, SearchOptions, SearchResult } from "./src/types.ts";
+export type {
+  AlgorithmType,
+  FuzzySearchOptions,
+  OptimizationOptions,
+  SearchOptions,
+  SearchResult,
+} from "./src/types.ts";
 
 // Strategy exports
 export { strategies } from "./src/strategies.ts";
