@@ -3,32 +3,74 @@
 [![JSR](https://jsr.io/badges/@ys319/fuzzy-search)](https://jsr.io/@ys319/fuzzy-search)
 [![JSR Score](https://jsr.io/badges/@ys319/fuzzy-search/score)](https://jsr.io/@ys319/fuzzy-search)
 
-A high-performance fuzzy search library for TypeScript/Deno that combines N-gram
-indexing with Levenshtein distance for optimal speed and accuracy.
+A high-performance fuzzy search library for TypeScript/Deno with multiple
+scoring algorithms and configurable optimizations.
 
 ## Features
 
-- 🚀 **Fast**: Two-stage approach (N-gram filtering + Levenshtein ranking) for
-  sub-millisecond searches
-- 🎯 **Accurate**: Uses Levenshtein distance for human-like similarity matching
-- 🔧 **Flexible**: Configurable N-gram size, thresholds, and result limits
+- **High Performance**: Optimized for speed with character-based indexing and
+  bit-parallel algorithms.
+- **Multiple Algorithms**: Supports Levenshtein, Damerau-Levenshtein,
+  Smith-Waterman, Jaro-Winkler, Needleman-Wunsch, and Hamming.
+- **Flexible Strategies**: Use pre-configured strategies for common use cases
+  (Hybrid, Completion, Correction, etc.).
+- **Hybrid Search**: Combines multiple algorithms (e.g., Smith-Waterman +
+  Damerau-Levenshtein) for robust matching.
+- **Typo Tolerance**: Handles insertions, deletions, substitutions, and
+  transpositions.
+- **Zero Dependencies**: Lightweight and easy to integrate.
+- 🔧 **Configurable Optimizations**: Toggle optimizations for debugging and
+  benchmarking
 - 📝 **Type-safe**: Full TypeScript support with generics
 - 🌏 **Japanese support**: Works seamlessly with Japanese, English, and mixed
   text
 - 📦 **Zero dependencies**: Pure TypeScript implementation
 
-## Algorithm
+## Presets
 
-This library uses a **two-stage approach** optimized for small to medium
-datasets (thousands to tens of thousands of items):
+For common use cases, we provide ready-to-use preset configurations:
 
-1. **Stage 1 - Fast Filtering**: N-gram inverted index quickly narrows down
-   candidates
-2. **Stage 2 - Precise Ranking**: Levenshtein distance calculates exact
-   similarity scores
+```typescript
+import { FuzzySearch, strategies } from "@ys319/fuzzy-search";
 
-This approach balances speed and accuracy better than simple linear search or
-heavy full-text search engines for this data scale.
+// Hybrid (Default): Best for general purpose (Smith-Waterman + Damerau-Levenshtein)
+const hybrid = new FuzzySearch({ keys: ["name"], strategy: strategies.Hybrid });
+
+// Completion: Optimized for autocomplete (Jaro-Winkler)
+const completion = new FuzzySearch({
+  keys: ["name"],
+  strategy: strategies.Completion,
+});
+
+// Correction: Optimized for typo correction (Damerau-Levenshtein)
+const correction = new FuzzySearch({
+  keys: ["name"],
+  strategy: strategies.Correction,
+});
+
+// Code: Optimized for fixed-length codes (Hamming)
+const code = new FuzzySearch({ keys: ["code"], strategy: strategies.Code });
+```
+
+## Algorithm Selection
+
+Choose the best algorithm for your use case:
+
+- **Smith-Waterman** (Default): Best for partial matching and finding substrings
+  (e.g., "organic" in "fresh organic apple").
+- **Levenshtein**: Best for general fuzzy search. Handles insertions, deletions,
+  and substitutions.
+- **Damerau-Levenshtein**: Like Levenshtein but also handles transpositions
+  (e.g., "teh" → "the"). Ideal for typo correction.
+- **Jaro-Winkler**: Optimized for short strings and names. Gives a bonus for
+  prefix matches.
+- **Needleman-Wunsch**: Global alignment. Useful for comparing strings of
+  similar length.
+- **Hamming**: Extremely fast O(n) comparison, but only works for strings of
+  exactly the same length.
+
+For a detailed comparison and examples, see
+[ALGORITHM_GUIDE.md](./ALGORITHM_GUIDE.md).
 
 ## Installation
 
@@ -66,7 +108,7 @@ const products: Product[] = [
 ];
 
 // Create search instance with keys to search
-const search = new FuzzySearch<Product>(["name", "category"]);
+const search = new FuzzySearch<Product>({ keys: ["name", "category"] });
 
 // Build index
 search.addAll(products);
@@ -80,64 +122,6 @@ console.log(results);
 // ]
 ```
 
-## API Reference
-
-### `FuzzySearch<T>`
-
-The main search class.
-
-#### Constructor
-
-```typescript
-new FuzzySearch<T>(keys: (keyof T)[])
-```
-
-- `keys`: Array of object properties to search across
-
-#### Methods
-
-##### `addAll(data: T[]): void`
-
-Adds items to the search index. This will rebuild the entire index.
-
-```typescript
-const products: Product[] = [...];
-search.addAll(products);
-```
-
-##### `search(query: string, options?: SearchOptions): SearchResult<T>[]`
-
-Performs a fuzzy search and returns ranked results.
-
-```typescript
-const results = search.search("りんご", {
-  threshold: 0.3, // 0.0 = exact match, 1.0 = completely different
-  limit: 10, // Maximum results to return
-  ngramSize: 2, // N-gram size (2 or 3)
-});
-```
-
-### Types
-
-#### `SearchOptions`
-
-```typescript
-interface SearchOptions {
-  threshold?: number; // Default: 0.4 (recommended: 0.3-0.5)
-  limit?: number; // Default: 10
-  ngramSize?: number; // Default: 2 (bigram)
-}
-```
-
-#### `SearchResult<T>`
-
-```typescript
-interface SearchResult<T> {
-  item: T; // The matched item
-  score: number; // Similarity score (0.0 = perfect match, higher = less similar)
-}
-```
-
 ## Examples
 
 For more usage examples, see the [examples/](./examples/) directory:
@@ -147,8 +131,8 @@ For more usage examples, see the [examples/](./examples/) directory:
 - **[japanese_text.ts](./examples/japanese_text.ts)** - Japanese text search
 - **[multi_field.ts](./examples/multi_field.ts)** - Search across multiple
   fields
-- **[tuning.ts](./examples/tuning.ts)** - Performance tuning (bigram vs trigram,
-  threshold tuning)
+- **[tuning.ts](./examples/tuning.ts)** - Threshold tuning and algorithm
+  selection
 
 Run any example with:
 
@@ -156,14 +140,21 @@ Run any example with:
 deno run examples/<example-name>.ts
 ```
 
-## Performance
+**Benchmark Results (10,000 items):**
 
-Benchmarks on Apple M2 (your results may vary):
+| Algorithm               | Index Build | Search (Exact) | Search (Typo) |
+| :---------------------- | :---------- | :------------- | :------------ |
+| **Hamming**             | ~5.8 ms     | 0.4 ms         | 0.4 ms        |
+| **Levenshtein**         | 5.8 ms      | 0.5 ms         | 1.2 ms        |
+| **Jaro-Winkler**        | ~5.8 ms     | 0.8 ms         | 0.9 ms        |
+| **Needleman-Wunsch**    | ~5.8 ms     | 1.2 ms         | 1.2 ms        |
+| **Smith-Waterman**      | ~5.8 ms     | 2.1 ms         | 1.3 ms        |
+| **Damerau-Levenshtein** | ~5.8 ms     | 2.2 ms         | 2.4 ms        |
+| **HybridSearch**        | 6.0 ms      | 5.2 ms         | 2.5 ms        |
 
-| Dataset Size | Index Build Time | Search Time (avg) |
-| ------------ | ---------------- | ----------------- |
-| 1,000 items  | ~3.7ms           | ~0.85ms           |
-| 10,000 items | ~47ms            | ~11ms             |
+_Benchmarks run on Apple M2 with Deno 2.x using realistic random data (Faker).
+Index build time is similar for all single algorithms as it primarily involves
+CharacterIndex construction._
 
 Run benchmarks yourself:
 
@@ -196,29 +187,27 @@ deno check mod.ts
 This library implements a **two-stage fuzzy search algorithm** with advanced
 optimizations:
 
-### Stage 1: N-gram Indexing (Fast Filtering)
+### Stage 1: Character Index (Fast Filtering)
 
-Text is tokenized into N-grams (default: bigram = 2 characters):
+Uses an optimized character-based inverted index to quickly filter candidates.
 
-```
-"りんご" → ["りん", "んご"]
-```
+1. **Indexing**: Maps each unique character to the list of items containing it.
+2. **Filtering**: When searching, it intersects the item lists for characters
+   present in the query.
+3. **Result**: A reduced set of candidate items that contain the necessary
+   characters, significantly reducing the workload for the scoring stage.
 
-An inverted index maps each N-gram to documents containing it, enabling fast
-candidate retrieval (O(1) lookup per N-gram).
+### Stage 2: Distance Scoring (Precise Ranking)
 
-### Stage 2: Levenshtein Distance (Precise Ranking)
-
-For each candidate, calculate the
-[Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance)
-(minimum edit operations to transform one string to another).
+For each candidate from Stage 1, calculates the similarity score using the
+selected algorithm (e.g., Levenshtein, Smith-Waterman).
 
 **Optimizations:**
 
-- **Bitap Algorithm**: Uses bit-parallel operations for strings shorter than 32
-  characters, drastically improving speed.
-- **Memory Efficiency**: Reuses calculation buffers and caches intermediate
-  results to minimize garbage collection.
+- **Bitap Algorithm**: Uses bit-parallel operations for fast approximate string
+  matching on short strings.
+- **Early Exit**: Stops calculation early if the score exceeds the threshold.
+- **Memory Efficiency**: Reuses buffers to minimize garbage collection.
 
 Normalized score = `distance / max(query.length, text.length)`
 
@@ -228,9 +217,9 @@ This provides accurate, human-intuitive similarity scores with high performance.
 
 For small to medium datasets (thousands to tens of thousands of items):
 
-- ✅ **Better than linear search**: N-gram index avoids checking every item
+- ✅ **Better than linear search**: Character index avoids checking every item
 - ✅ **Better than heavy engines**: Elasticsearch/Solr are overkill
-- ✅ **Better than simple algorithms**: Levenshtein provides superior accuracy
+- ✅ **Better than simple algorithms**: Multiple algorithm options for precision
 - ✅ **No dependencies**: Pure TypeScript, no external dependencies
 
 ## License

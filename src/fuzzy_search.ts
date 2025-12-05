@@ -1,38 +1,97 @@
-import type { SearchOptions, SearchResult } from "./types.ts";
+import type { AlgorithmType, FuzzySearchOptions, OptimizationOptions, SearchOptions, SearchResult } from "./types.ts";
+import type { SearchAlgorithm } from "./algorithms/types.ts";
+import { LevenshteinAlgorithm } from "./algorithms/levenshtein.ts";
+import { DamerauLevenshteinAlgorithm } from "./algorithms/damerau_levenshtein.ts";
+import { SmithWatermanAlgorithm } from "./algorithms/smith_waterman.ts";
+import { JaroWinklerAlgorithm } from "./algorithms/jaro_winkler.ts";
+import { NeedlemanWunschAlgorithm } from "./algorithms/needleman_wunsch.ts";
+import { HammingAlgorithm } from "./algorithms/hamming.ts";
+import { extractText, normalize } from "./utils/text.ts";
+import { computeSignature } from "./utils/signature.ts";
+import { CharacterIndex } from "./utils/character_index.ts";
 
 /**
- * High-performance fuzzy search engine using N-gram indexing and Levenshtein distance.
+ * High-performance fuzzy search engine using character-based indexing.
  *
- * Combines fast N-gram candidate filtering with precise Levenshtein distance ranking
+ * Combines fast character-based candidate filtering with precise distance ranking
  * for optimal speed and accuracy on small to medium datasets.
  *
  * @example Basic usage
  * ```typescript
- * const search = new FuzzySearch<Product>(["name", "category"]);
+ * const search = new FuzzySearch<Product>({ keys: ["name", "category"] });
  * search.addAll(products);
  * const results = search.search("query", { threshold: 0.3 });
  * ```
  */
 export class FuzzySearch<T> {
-  private index: Map<string, Set<number>> = new Map();
   private items: T[] = [];
   private searchKeys: (keyof T)[];
-  private defaultNgramSize: number;
-  private currentIndexNgramSize: number = 2;
-  // Reusable buffers for Levenshtein calculation to avoid allocation
-  private v0: number[] = [];
-  private v1: number[] = [];
+  private defaultAlgorithm: AlgorithmType | AlgorithmType[];
+  private mode: "min" | "average";
+  private optimizations: Required<OptimizationOptions>;
+  // Character signatures for fast filtering
+  private signatures: Uint32Array = new Uint32Array(0);
+  // Character-based index for candidate filtering
+  private characterIndex: CharacterIndex<T> = new CharacterIndex<T>();
+
+  // Algorithm instances
+  private levenshteinAlgo: LevenshteinAlgorithm;
+  private damerauLevenshteinAlgo = new DamerauLevenshteinAlgorithm();
+  private smithWatermanAlgo = new SmithWatermanAlgorithm();
+  private jaroWinklerAlgo = new JaroWinklerAlgorithm();
+  private needlemanWunschAlgo = new NeedlemanWunschAlgorithm();
+  private hammingAlgo = new HammingAlgorithm();
 
   /**
    * Creates a new FuzzySearch instance.
    *
-   * @param keys - Array of object keys to search across
-   * @param options - Optional default configuration
+   * @param options - Configuration options including keys, items, algorithm, etc.
+   * @example
+   * ```typescript
+   * const search = new FuzzySearch<Product>({
+   *   keys: ["name", "category"],
+   *   items: products,
+   *   algorithm: "smith-waterman"
+   * });
+   * ```
    */
-  constructor(keys: (keyof T)[], options: { ngramSize?: number } = {}) {
-    this.searchKeys = keys;
-    this.defaultNgramSize = options.ngramSize ?? 2;
-    this.currentIndexNgramSize = this.defaultNgramSize;
+  constructor(options: FuzzySearchOptions<T>) {
+    // Merge strategy options if provided
+    if (options.strategy) {
+      options = {
+        ...options,
+        algorithm: options.algorithm ?? options.strategy.algorithm,
+        mode: options.mode ?? options.strategy.mode,
+      };
+    }
+
+    this.searchKeys = options.keys;
+    // Default to Hybrid (Smith-Waterman + Damerau-Levenshtein) if not specified
+    this.defaultAlgorithm = options.algorithm ??
+      ["smith-waterman", "damerau-levenshtein"];
+    this.mode = options.mode ?? "min";
+
+    // Initialize optimization options with defaults
+    this.optimizations = {
+      useBitap: options.optimizations?.useBitap ?? true,
+      useSignatureFilter: options.optimizations?.useSignatureFilter ?? true,
+      useTwoStageEvaluation: options.optimizations?.useTwoStageEvaluation ??
+        true,
+      usePrefixSuffixTrimming: options.optimizations?.usePrefixSuffixTrimming ??
+        true,
+      useEarlyExactMatch: options.optimizations?.useEarlyExactMatch ?? true,
+    };
+
+    // Initialize Levenshtein with optimization options
+    this.levenshteinAlgo = new LevenshteinAlgorithm({
+      useBitap: this.optimizations.useBitap,
+      usePrefixSuffixTrimming: this.optimizations.usePrefixSuffixTrimming,
+    });
+
+    // Add initial items if provided
+    if (options.items !== undefined) {
+      this.addAll(options.items);
+    }
   }
 
   /**
@@ -43,7 +102,8 @@ export class FuzzySearch<T> {
    */
   public addAll(data: T[]): void {
     this.items = data;
-    this.buildIndex(this.defaultNgramSize);
+    this.signatures = new Uint32Array(data.length);
+    this.buildIndex();
   }
 
   /**
@@ -57,183 +117,225 @@ export class FuzzySearch<T> {
     query: string,
     options: SearchOptions = {},
   ): SearchResult<T>[] {
-    const { threshold = 0.4, limit = 10, ngramSize = this.defaultNgramSize } =
-      options;
-    const normalizedQuery = query.toLowerCase();
+    const {
+      threshold = 0.4,
+      limit = 10,
+      algorithm = this.defaultAlgorithm,
+    } = options;
+    const normalizedQuery = normalize(query);
 
-    // Rebuild index if ngramSize differs from current index
-    if (ngramSize !== this.currentIndexNgramSize) {
-      this.buildIndex(ngramSize);
-    }
+    // Determine which algorithm(s) to use
+    const algorithms = Array.isArray(algorithm) ? algorithm : [algorithm];
 
-    // Stage 1: Fast candidate filtering using N-gram index
-    const queryTokens = this.tokenize(normalizedQuery, ngramSize);
-    const candidateIds = new Set<number>();
-
-    // Handle empty or very short queries by searching all items
-    if (normalizedQuery.length === 0 || queryTokens.length === 0) {
-      for (let i = 0; i < this.items.length; i++) {
-        candidateIds.add(i);
+    // Create algorithm instances array
+    const searchAlgos: SearchAlgorithm[] = algorithms.map((alg) => {
+      if (alg === "smith-waterman") {
+        return this.smithWatermanAlgo;
+      } else if (alg === "damerau-levenshtein") {
+        return this.damerauLevenshteinAlgo;
+      } else if (alg === "jaro-winkler") {
+        return this.jaroWinklerAlgo;
+      } else if (alg === "needleman-wunsch") {
+        return this.needlemanWunschAlgo;
+      } else if (alg === "hamming") {
+        return this.hammingAlgo;
+      } else {
+        return this.levenshteinAlgo;
       }
-    } else {
-      // Find items that share at least one N-gram with the query
-      for (const token of queryTokens) {
-        if (token.length > 0) {
-          const ids = this.index.get(token);
-          // Skip empty tokens
-          if (ids === undefined) continue;
+    });
 
-          for (const id of ids) {
-            candidateIds.add(id);
-          }
-        }
-      }
+    // Stage 1: Fast candidate filtering using character index
+    const candidateIds = this.findCandidates(normalizedQuery);
 
-      // If no candidates found but query is short, fall back to all items
-      if (candidateIds.size === 0 && normalizedQuery.length < ngramSize) {
-        for (let i = 0; i < this.items.length; i++) {
-          candidateIds.add(i);
-        }
-      }
-    }
+    // Calculate query signature for fast filtering
+    const querySignature = computeSignature(normalizedQuery);
 
     // Stage 1.5: OPTIMIZATION - Fast path for exact matches
-    // Check if query exactly matches any field value
-    // This bypasses expensive Levenshtein calculations for perfect matches
-    const exactMatchIds: number[] = [];
-    const remainingCandidates = new Set(candidateIds);
+    const { exactMatches, remainingIds } = this.processExactMatches(
+      candidateIds,
+      normalizedQuery,
+      querySignature,
+    );
+
+    // Stage 2+: Rank candidates (with exact matches already removed)
+    const rankedResults = this.rankCandidates(
+      remainingIds,
+      normalizedQuery,
+      searchAlgos,
+      this.mode,
+      threshold,
+      limit - exactMatches.length, // Adjust limit to account for exact matches
+    );
+
+    // Combine and return results
+    return [...exactMatches, ...rankedResults].slice(0, limit);
+  }
+
+  /**
+   * Stage 1: Fast candidate filtering using character-based index.
+   * @private
+   */
+  private findCandidates(normalizedQuery: string): number[] {
+    // Handle empty queries
+    if (normalizedQuery.length === 0) {
+      return Array.from({ length: this.items.length }, (_, i) => i);
+    }
+
+    return this.characterIndex.findCandidates(normalizedQuery);
+  }
+
+  /**
+   * Stage 1.5: Process exact matches and filter by signature.
+   * @private
+   */
+  private processExactMatches(
+    candidateIds: number[],
+    normalizedQuery: string,
+    querySignature: number,
+  ): { exactMatches: SearchResult<T>[]; remainingIds: number[] } {
+    // Skip early exact match detection if disabled
+    if (!this.optimizations.useEarlyExactMatch) {
+      return { exactMatches: [], remainingIds: candidateIds };
+    }
+
+    const exactMatches: SearchResult<T>[] = [];
+    const remainingIds: number[] = [];
 
     for (const id of candidateIds) {
+      // OPTIMIZATION: Check character signature (if enabled)
+      if (this.optimizations.useSignatureFilter) {
+        if (
+          querySignature !== 0 && (querySignature & this.signatures[id]) === 0
+        ) {
+          continue;
+        }
+      }
+
       const item = this.items[id];
       let isExactMatch = false;
       for (const key of this.searchKeys) {
-        const fieldText = String(item[key] ?? "").toLowerCase();
+        const fieldText = normalize(String(item[key] ?? ""));
         if (fieldText === normalizedQuery) {
-          exactMatchIds.push(id);
-          remainingCandidates.delete(id);
+          exactMatches.push({ item, score: 0 });
           isExactMatch = true;
           break; // Move to next candidate
         }
       }
-      if (isExactMatch) continue;
+
+      if (!isExactMatch) {
+        remainingIds.push(id);
+      }
     }
 
-    // Stage 2: Precise scoring using Levenshtein distance
+    return { exactMatches, remainingIds };
+  }
+
+  /**
+   * Stage 2: Rank candidates using detailed scoring.
+   * Supports multiple algorithms with different combination strategies.
+   * @private
+   */
+  private rankCandidates(
+    candidateIds: number[],
+    normalizedQuery: string,
+    searchAlgos: SearchAlgorithm[],
+    mode: "min" | "average",
+    threshold: number,
+    limit: number,
+  ): SearchResult<T>[] {
     const results: SearchResult<T>[] = [];
 
-    // Add exact matches first (score = 0)
-    for (const id of exactMatchIds) {
-      results.push({ item: this.items[id], score: 0 });
-    }
+    /**
+     * Helper function to calculate combined score from multiple algorithms.
+     */
+    const calculateCombinedScore = (text: string): number => {
+      const scores = searchAlgos.map((algo) =>
+        algo.score(normalizedQuery, text)
+      );
+      if (mode === "average") {
+        return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      } else {
+        // "min" strategy: use the best (minimum) score
+        return Math.min(...scores);
+      }
+    };
 
-    // OPTIMIZATION: 2-stage evaluation for large candidate sets
-    // When we have many candidates, do coarse filtering first
-    let candidatesToProcess = remainingCandidates;
-
-    // Map to store pre-calculated combined text for candidates
+    // OPTIMIZATION: 2-stage evaluation for large candidate sets (if enabled)
+    let candidatesToProcess = candidateIds;
     const candidateTextCache = new Map<number, string>();
 
-    if (remainingCandidates.size > 100 && normalizedQuery.length > 0) {
+    if (
+      this.optimizations.useTwoStageEvaluation &&
+      candidateIds.length > 100 &&
+      normalizedQuery.length > 0
+    ) {
       // Phase A: Coarse evaluation (combined text only)
       const coarseScores: Array<{ id: number; score: number }> = [];
 
-      for (const id of remainingCandidates) {
+      for (const id of candidateIds) {
         const item = this.items[id];
-        const combinedText = this.extractText(item);
+        const combinedText = extractText(item, this.searchKeys);
         candidateTextCache.set(id, combinedText); // Cache for later use
-        const distance = this.levenshtein(normalizedQuery, combinedText);
-        const score = distance /
-          Math.max(normalizedQuery.length, combinedText.length);
+
+        const score = calculateCombinedScore(combinedText);
         coarseScores.push({ id, score });
       }
 
       // Phase B: Select top candidates for detailed evaluation
-      // Sort by score and take top 50, or all that pass threshold
       const sortedCandidates = coarseScores
         .filter((c) => c.score <= threshold)
         .sort((a, b) => a.score - b.score)
-        .slice(0, Math.min(50, limit * 3)); // 3x limit for safety margin
+        .slice(0, Math.min(50, limit * 3));
 
-      candidatesToProcess = new Set(sortedCandidates.map((c) => c.id));
+      candidatesToProcess = sortedCandidates.map((c) => c.id);
     }
 
     // Process candidates with detailed scoring
     for (const id of candidatesToProcess) {
       const item = this.items[id];
-
-      // Calculate score for each search key and take the minimum (best match)
       let bestScore = Infinity;
 
-      // Special case: empty query matches everything with score 0
       if (normalizedQuery.length === 0) {
         bestScore = 0;
       } else {
-        // Check combined text (for multi-field queries)
-        // Use cached text if available, otherwise extract
         const combinedText = candidateTextCache.get(id) ??
-          this.extractText(item);
-        const combinedDistance = this.levenshtein(
-          normalizedQuery,
-          combinedText,
-        );
-        const combinedScore = combinedDistance /
-          Math.max(normalizedQuery.length, combinedText.length);
+          extractText(item, this.searchKeys);
+
+        const combinedScore = calculateCombinedScore(combinedText);
         bestScore = Math.min(bestScore, combinedScore);
 
-        // OPTIMIZATION: Early termination for perfect matches
         if (bestScore === 0) {
           results.push({ item, score: 0 });
           continue;
         }
 
-        // Check each individual field and words within fields
         for (const key of this.searchKeys) {
-          const fieldText = String(item[key] ?? "").toLowerCase();
-
-          // Score against entire field
-          const fieldDistance = this.levenshtein(normalizedQuery, fieldText);
-          const fieldScore = fieldDistance /
-            Math.max(normalizedQuery.length, fieldText.length);
+          const fieldText = normalize(String(item[key] ?? ""));
+          const fieldScore = calculateCombinedScore(fieldText);
           bestScore = Math.min(bestScore, fieldScore);
 
-          // OPTIMIZATION: Early termination for perfect matches
-          if (bestScore === 0) {
+          if (bestScore === 0) break;
+
+          if (fieldText.includes(normalizedQuery)) {
+            bestScore = 0;
             break;
           }
 
-          // OPTIMIZATION: Check for substring match (e.g., "gmail" in "sato@gmail.com")
-          // Supports single-character queries like "京" in "東京タワー"
-          if (fieldText.includes(normalizedQuery)) {
-            bestScore = 0;
-            break; // Perfect substring match, no need to check further
-          }
-
-          // Split on common delimiters (space, @, -, _, ., etc)
           const words = fieldText.split(/[\s@\-_.]+/).filter((w) =>
             w.length > 0
           );
           for (const word of words) {
-            const wordDistance = this.levenshtein(normalizedQuery, word);
-            const wordScore = wordDistance /
-              Math.max(normalizedQuery.length, word.length);
+            const wordScore = calculateCombinedScore(word);
             bestScore = Math.min(bestScore, wordScore);
 
-            // OPTIMIZATION: Early termination for perfect matches
-            if (bestScore === 0) {
-              break;
-            }
+            if (bestScore === 0) break;
 
-            // OPTIMIZATION: Check substring in word too
             if (word.includes(normalizedQuery)) {
               bestScore = 0;
               break;
             }
           }
-
-          // OPTIMIZATION: Early termination after word loop
-          if (bestScore === 0) {
-            break;
-          }
+          if (bestScore === 0) break;
         }
       }
 
@@ -242,213 +344,25 @@ export class FuzzySearch<T> {
       }
     }
 
-    // Sort by score (best matches first) and limit results
-    return results
-      .sort((a, b) => a.score - b.score)
-      .slice(0, limit);
+    return results;
   }
 
   /**
-   * Builds the N-gram inverted index for fast candidate filtering.
+   * Builds the character-based search index.
    * @private
    */
-  /**
-   * Builds the N-gram inverted index for fast candidate filtering.
-   * @private
-   */
-  private buildIndex(ngramSize: number): void {
-    this.index.clear();
-    this.currentIndexNgramSize = ngramSize;
-
-    // Reusable Set to avoid allocation in loop
-    const uniqueTokens = new Set<string>();
-
-    for (let id = 0; id < this.items.length; id++) {
-      const item = this.items[id];
-      uniqueTokens.clear();
-
-      // Tokenize each field directly without joining
-      for (const key of this.searchKeys) {
-        const text = String(item[key] ?? "").toLowerCase();
-        if (text.length < ngramSize) {
-          uniqueTokens.add(text);
-          continue;
-        }
-
-        for (let i = 0; i <= text.length - ngramSize; i++) {
-          uniqueTokens.add(text.slice(i, i + ngramSize));
-        }
-      }
-
-      // Add unique tokens to the global index
-      for (const token of uniqueTokens) {
-        let ids = this.index.get(token);
-        if (ids === undefined) {
-          ids = new Set();
-          this.index.set(token, ids);
-        }
-        ids.add(id);
-      }
-    }
-  }
-
-  /**
-   * Extracts and normalizes searchable text from an item.
-   * @private
-   */
-  private extractText(item: T): string {
-    return this.searchKeys
-      .map((key) => String(item[key] ?? ""))
-      .join(" ")
-      .toLowerCase();
-  }
-
-  /**
-   * Tokenizes text into N-grams.
-   * @private
-   */
-  private tokenize(text: string, n: number = 2): string[] {
-    const tokens: string[] = [];
-    if (text.length < n) return [text];
-
-    for (let i = 0; i <= text.length - n; i++) {
-      tokens.push(text.slice(i, i + n));
-    }
-    return tokens;
-  }
-  /**
-   * Calculates Levenshtein distance between two strings.
-   * Optimized by trimming common prefix/suffix and using Bitap algorithm for short strings.
-   * @private
-   */
-  private levenshtein(s1: string, s2: string): number {
-    if (s1 === s2) return 0;
-    if (s1.length === 0) return s2.length;
-    if (s2.length === 0) return s1.length;
-
-    // OPTIMIZATION: Trim common prefix
-    let start = 0;
-    while (
-      start < s1.length && start < s2.length &&
-      s1.charCodeAt(start) === s2.charCodeAt(start)
-    ) {
-      start++;
-    }
-    if (start > 0) {
-      s1 = s1.slice(start);
-      s2 = s2.slice(start);
+  private buildIndex(): void {
+    // Build character signatures
+    for (const [i, item] of this.items.entries()) {
+      const text = extractText(item, this.searchKeys);
+      const normalizedText = normalize(text);
+      this.signatures[i] = computeSignature(normalizedText);
     }
 
-    // OPTIMIZATION: Trim common suffix
-    let end1 = s1.length - 1;
-    let end2 = s2.length - 1;
-    while (
-      end1 >= 0 && end2 >= 0 &&
-      s1.charCodeAt(end1) === s2.charCodeAt(end2)
-    ) {
-      end1--;
-      end2--;
-    }
-    if (end1 < s1.length - 1) {
-      s1 = s1.slice(0, end1 + 1);
-      s2 = s2.slice(0, end2 + 1);
-    }
-
-    // Check lengths again after trimming
-    if (s1.length === 0) return s2.length;
-    if (s2.length === 0) return s1.length;
-
-    // OPTIMIZATION: Use Bitap algorithm for short patterns (<= 32 chars)
-    // Ensure s1 is the shorter string (pattern) if possible
-    if (s1.length > s2.length) {
-      [s1, s2] = [s2, s1];
-    }
-
-    if (s1.length <= 32) {
-      return this.levenshteinBitVector(s1, s2);
-    }
-
-    return this.levenshteinMatrix(s1, s2);
-  }
-
-  /**
-   * Myers' Bit-vector algorithm for Levenshtein distance.
-   * Extremely fast for patterns <= 32 characters using bitwise parallelism.
-   * @private
-   */
-  private levenshteinBitVector(s1: string, s2: string): number {
-    const m = s1.length;
-    const n = s2.length;
-
-    // Precompute pattern bitmasks
-    // Using a Map for sparse character codes is efficient enough
-    const peq = new Map<number, number>();
-    for (let i = 0; i < m; i++) {
-      const code = s1.charCodeAt(i);
-      peq.set(code, (peq.get(code) ?? 0) | (1 << i));
-    }
-
-    let score = m;
-    let pv = -1; // All 1s (vertical positive)
-    let mv = 0; // (vertical negative)
-    const lastBit = 1 << (m - 1);
-
-    for (let j = 0; j < n; j++) {
-      const eq = peq.get(s2.charCodeAt(j)) ?? 0;
-      const xv = eq | mv;
-      const xh = (((eq | mv) & pv) + pv) ^ pv | eq | mv;
-
-      let ph = mv | ~(xh | pv);
-      let mh = pv & xh;
-
-      if ((ph & lastBit) !== 0) score++;
-      if ((mh & lastBit) !== 0) score--;
-
-      ph = (ph << 1) | 1;
-      mh = mh << 1;
-
-      pv = mh | ~(xv | ph);
-      mv = ph & xv;
-    }
-
-    return score;
-  }
-
-  /**
-   * Standard Levenshtein distance using matrix (two rows)
-   * Used as fallback for long strings (> 32 chars).
-   * @private
-   */
-  private levenshteinMatrix(s1: string, s2: string): number {
-    // Ensure buffers are large enough
-    if (this.v0.length <= s2.length) {
-      this.v0 = new Array(s2.length + 1);
-      this.v1 = new Array(s2.length + 1);
-    }
-
-    // Initialize v0 (the previous row of distances)
-    for (let i = 0; i <= s2.length; i++) {
-      this.v0[i] = i;
-    }
-
-    for (let i = 0; i < s1.length; i++) {
-      this.v1[0] = i + 1;
-
-      for (let j = 0; j < s2.length; j++) {
-        const cost = s1[i] === s2[j] ? 0 : 1;
-        this.v1[j + 1] = Math.min(
-          this.v1[j] + 1,
-          this.v0[j + 1] + 1,
-          this.v0[j] + cost,
-        );
-      }
-
-      // Swap arrays
-      const temp = this.v0;
-      this.v0 = this.v1;
-      this.v1 = temp;
-    }
-
-    return this.v0[s2.length];
+    // Build character-based index
+    this.characterIndex.buildIndex(
+      this.items,
+      (item) => extractText(item, this.searchKeys),
+    );
   }
 }
