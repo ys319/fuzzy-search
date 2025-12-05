@@ -29,20 +29,11 @@
 
 // Core exports
 export { FuzzySearch } from "./src/fuzzy_search.ts";
-export type {
-  AlgorithmType,
-  FuzzySearchOptions,
-  OptimizationOptions,
-  SearchOptions,
-  SearchResult,
-} from "./src/types.ts";
+export type { AlgorithmType, FuzzySearchOptions, OptimizationOptions, SearchOptions, SearchResult } from "./src/types.ts";
 
-// Preset exports
-export { HybridSearch } from "./src/presets/hybrid_search.ts";
-export { FullTextSearch } from "./src/presets/full_text_search.ts";
-export { TypoCorrection } from "./src/presets/typo_correction.ts";
-export { Autocomplete } from "./src/presets/autocomplete.ts";
-export { CodeSearch } from "./src/presets/code_search.ts";
+// Strategy exports
+export { strategies } from "./src/strategies.ts";
+export type { SearchStrategy } from "./src/types.ts";
 
 // Algorithm exports (for advanced usage)
 export type { SearchAlgorithm } from "./src/algorithms/types.ts";

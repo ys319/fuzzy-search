@@ -1,10 +1,4 @@
-import type {
-  AlgorithmType,
-  FuzzySearchOptions,
-  OptimizationOptions,
-  SearchOptions,
-  SearchResult,
-} from "./types.ts";
+import type { AlgorithmType, FuzzySearchOptions, OptimizationOptions, SearchOptions, SearchResult } from "./types.ts";
 import type { SearchAlgorithm } from "./algorithms/types.ts";
 import { LevenshteinAlgorithm } from "./algorithms/levenshtein.ts";
 import { DamerauLevenshteinAlgorithm } from "./algorithms/damerau_levenshtein.ts";
@@ -33,7 +27,7 @@ export class FuzzySearch<T> {
   private items: T[] = [];
   private searchKeys: (keyof T)[];
   private defaultAlgorithm: AlgorithmType | AlgorithmType[];
-  private algorithmStrategy: "min" | "average";
+  private mode: "min" | "average";
   private optimizations: Required<OptimizationOptions>;
   // Character signatures for fast filtering
   private signatures: Uint32Array = new Uint32Array(0);
@@ -62,9 +56,20 @@ export class FuzzySearch<T> {
    * ```
    */
   constructor(options: FuzzySearchOptions<T>) {
+    // Merge strategy options if provided
+    if (options.strategy) {
+      options = {
+        ...options,
+        algorithm: options.algorithm ?? options.strategy.algorithm,
+        mode: options.mode ?? options.strategy.mode,
+      };
+    }
+
     this.searchKeys = options.keys;
-    this.defaultAlgorithm = options.algorithm ?? "smith-waterman";
-    this.algorithmStrategy = options.algorithmStrategy ?? "min";
+    // Default to Hybrid (Smith-Waterman + Damerau-Levenshtein) if not specified
+    this.defaultAlgorithm = options.algorithm ??
+      ["smith-waterman", "damerau-levenshtein"];
+    this.mode = options.mode ?? "min";
 
     // Initialize optimization options with defaults
     this.optimizations = {
@@ -84,7 +89,7 @@ export class FuzzySearch<T> {
     });
 
     // Add initial items if provided
-    if (options.items) {
+    if (options.items !== undefined) {
       this.addAll(options.items);
     }
   }
@@ -157,7 +162,7 @@ export class FuzzySearch<T> {
       remainingIds,
       normalizedQuery,
       searchAlgos,
-      this.algorithmStrategy,
+      this.mode,
       threshold,
       limit - exactMatches.length, // Adjust limit to account for exact matches
     );
@@ -234,7 +239,7 @@ export class FuzzySearch<T> {
     candidateIds: number[],
     normalizedQuery: string,
     searchAlgos: SearchAlgorithm[],
-    strategy: "min" | "average",
+    mode: "min" | "average",
     threshold: number,
     limit: number,
   ): SearchResult<T>[] {
@@ -247,7 +252,7 @@ export class FuzzySearch<T> {
       const scores = searchAlgos.map((algo) =>
         algo.score(normalizedQuery, text)
       );
-      if (strategy === "average") {
+      if (mode === "average") {
         return scores.reduce((sum, score) => sum + score, 0) / scores.length;
       } else {
         // "min" strategy: use the best (minimum) score

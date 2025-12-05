@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { HybridSearch } from "../mod.ts";
+import { FuzzySearch, strategies } from "../mod.ts";
 
 interface TestData {
   text: string;
@@ -12,9 +12,10 @@ Deno.test("HybridSearch - transposition handling (teh→the)", () => {
     { text: "apple banana" },
   ];
 
-  const search = new HybridSearch<TestData>({
+  const search = new FuzzySearch<TestData>({
     keys: ["text"],
     items: data,
+    strategy: strategies.Hybrid,
   });
 
   // Character-based Index should handle "teh" → "the" (transposition)
@@ -31,9 +32,10 @@ Deno.test("HybridSearch - partial matching", () => {
     { text: "test@outlook.com" },
   ];
 
-  const search = new HybridSearch<TestData>({
+  const search = new FuzzySearch<TestData>({
     keys: ["text"],
     items: data,
+    strategy: strategies.Hybrid,
   });
 
   // Smith-Waterman should handle partial match well
@@ -49,9 +51,10 @@ Deno.test("HybridSearch - combined advantage", () => {
     { text: "application" },
   ];
 
-  const search = new HybridSearch<TestData>({
+  const search = new FuzzySearch<TestData>({
     keys: ["text"],
     items: data,
+    strategy: strategies.Hybrid,
   });
 
   // Test typo + partial match

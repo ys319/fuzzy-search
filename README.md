@@ -8,16 +8,17 @@ scoring algorithms and configurable optimizations.
 
 ## Features
 
-- 🚀 **Fast**: Two-stage approach (Character Index filtering + distance ranking)
-  for sub-millisecond searches
-- 🎯 **Multiple Algorithms**: 6 algorithms for different use cases
-  - **Smith-Waterman** (default): Optimized for partial matching and substrings
-  - **Damerau-Levenshtein**: Better for typos with transpositions (e.g., "teh" →
-    "the")
-  - **Levenshtein**: General purpose fuzzy matching
-  - **Jaro-Winkler**: Best for short strings and names
-  - **Needleman-Wunsch**: Global alignment for similar-length strings
-  - **Hamming**: Fastest, for equal-length strings only
+- **High Performance**: Optimized for speed with character-based indexing and
+  bit-parallel algorithms.
+- **Multiple Algorithms**: Supports Levenshtein, Damerau-Levenshtein,
+  Smith-Waterman, Jaro-Winkler, Needleman-Wunsch, and Hamming.
+- **Flexible Strategies**: Use pre-configured strategies for common use cases
+  (Hybrid, Completion, Correction, etc.).
+- **Hybrid Search**: Combines multiple algorithms (e.g., Smith-Waterman +
+  Damerau-Levenshtein) for robust matching.
+- **Typo Tolerance**: Handles insertions, deletions, substitutions, and
+  transpositions.
+- **Zero Dependencies**: Lightweight and easy to integrate.
 - 🔧 **Configurable Optimizations**: Toggle optimizations for debugging and
   benchmarking
 - 📝 **Type-safe**: Full TypeScript support with generics
@@ -30,19 +31,46 @@ scoring algorithms and configurable optimizations.
 For common use cases, we provide ready-to-use preset configurations:
 
 ```typescript
-import { HybridSearch } from "jsr:@ys319/fuzzy-search";
+import { FuzzySearch, strategies } from "@ys319/fuzzy-search";
 
-// HybridSearch: Best for transpositions + partial matching
-const search = new HybridSearch<Product>({ keys: ["name", "category"] });
-search.addAll(products);
-const results = search.search("teh"); // Finds "the" despite transposition
+// Hybrid (Default): Best for general purpose (Smith-Waterman + Damerau-Levenshtein)
+const hybrid = new FuzzySearch({ keys: ["name"], strategy: strategies.Hybrid });
+
+// Completion: Optimized for autocomplete (Jaro-Winkler)
+const completion = new FuzzySearch({
+  keys: ["name"],
+  strategy: strategies.Completion,
+});
+
+// Correction: Optimized for typo correction (Damerau-Levenshtein)
+const correction = new FuzzySearch({
+  keys: ["name"],
+  strategy: strategies.Correction,
+});
+
+// Code: Optimized for fixed-length codes (Hamming)
+const code = new FuzzySearch({ keys: ["code"], strategy: strategies.Code });
 ```
 
 ## Algorithm Selection
 
-This library provides 6 different scoring algorithms optimized for different use
-cases. See [ALGORITHM_GUIDE.md](./ALGORITHM_GUIDE.md) for detailed comparison
-and selection guide.
+Choose the best algorithm for your use case:
+
+- **Smith-Waterman** (Default): Best for partial matching and finding substrings
+  (e.g., "organic" in "fresh organic apple").
+- **Levenshtein**: Best for general fuzzy search. Handles insertions, deletions,
+  and substitutions.
+- **Damerau-Levenshtein**: Like Levenshtein but also handles transpositions
+  (e.g., "teh" → "the"). Ideal for typo correction.
+- **Jaro-Winkler**: Optimized for short strings and names. Gives a bonus for
+  prefix matches.
+- **Needleman-Wunsch**: Global alignment. Useful for comparing strings of
+  similar length.
+- **Hamming**: Extremely fast O(n) comparison, but only works for strings of
+  exactly the same length.
+
+For a detailed comparison and examples, see
+[ALGORITHM_GUIDE.md](./ALGORITHM_GUIDE.md).
 
 ## Installation
 
@@ -94,77 +122,6 @@ console.log(results);
 // ]
 ```
 
-## API Reference
-
-### `FuzzySearch<T>`
-
-The main search class.
-
-#### Constructor
-
-```typescript
-new FuzzySearch<T>(options: FuzzySearchOptions<T>)
-```
-
-Options:
-
-- `keys`: Array of object properties to search across
-- `items`: Initial items to index (optional)
-- `algorithm`: Scoring algorithm (default: `"smith-waterman"`)
-- `algorithmStrategy`: How to combine multiple algorithms (`"min"` |
-  `"average"`)
-- `optimizations`: Toggle individual optimizations
-
-#### Methods
-
-##### `addAll(data: T[]): void`
-
-Adds items to the search index. This will rebuild the entire index.
-
-```typescript
-const products: Product[] = [...];
-search.addAll(products);
-```
-
-##### `search(query: string, options?: SearchOptions): SearchResult<T>[]`
-
-Performs a fuzzy search and returns ranked results.
-
-```typescript
-const results = search.search("りんご", {
-  threshold: 0.3, // 0.0 = exact match, 1.0 = completely different
-  limit: 10, // Maximum results to return
-  algorithm: "smith-waterman", // Algorithm selection
-});
-```
-
-### Types
-
-#### `SearchOptions`
-
-```typescript
-interface SearchOptions {
-  threshold?: number; // Default: 0.4 (recommended: 0.3-0.5)
-  limit?: number; // Default: 10
-  algorithm?:
-    | "levenshtein"
-    | "damerau-levenshtein"
-    | "smith-waterman"
-    | "jaro-winkler"
-    | "needleman-wunsch"
-    | "hamming"; // Default: "smith-waterman"
-}
-```
-
-#### `SearchResult<T>`
-
-```typescript
-interface SearchResult<T> {
-  item: T; // The matched item
-  score: number; // Similarity score (0.0 = perfect match, higher = less similar)
-}
-```
-
 ## Examples
 
 For more usage examples, see the [examples/](./examples/) directory:
@@ -183,22 +140,23 @@ Run any example with:
 deno run examples/<example-name>.ts
 ```
 
-## Performance
+**Benchmark Results (10,000 items):**
 
-**CharacterIndex Optimization Results:**
+| Algorithm               | Index Build | Search (Exact) | Search (Typo) |
+| :---------------------- | :---------- | :------------- | :------------ |
+| **Hamming**             | ~5.8 ms     | 0.4 ms         | 0.4 ms        |
+| **Levenshtein**         | 5.8 ms      | 0.5 ms         | 1.2 ms        |
+| **Jaro-Winkler**        | ~5.8 ms     | 0.8 ms         | 0.9 ms        |
+| **Needleman-Wunsch**    | ~5.8 ms     | 1.2 ms         | 1.2 ms        |
+| **Smith-Waterman**      | ~5.8 ms     | 2.1 ms         | 1.3 ms        |
+| **Damerau-Levenshtein** | ~5.8 ms     | 2.2 ms         | 2.4 ms        |
+| **HybridSearch**        | 6.0 ms      | 5.2 ms         | 2.5 ms        |
 
-The switch from N-gram to optimized CharacterIndex provides dramatic performance
-improvements:
+_Benchmarks run on Apple M2 with Deno 2.x using realistic random data (Faker).
+Index build time is similar for all single algorithms as it primarily involves
+CharacterIndex construction._
 
-| Operation      | Dataset Size | Before  | After  | Improvement     |
-| -------------- | ------------ | ------- | ------ | --------------- |
-| Index Build    | 1,000 items  | 5.8 ms  | 0.6 ms | **9.5x faster** |
-| Index Build    | 10,000 items | 70.5 ms | 6.2 ms | **11x faster**  |
-| Search (exact) | 1,000 items  | 2.1 ms  | 43 µs  | **49x faster**  |
-| Search (exact) | 10,000 items | 28.8 ms | 505 µs | **57x faster**  |
-| Search (typo)  | 1,000 items  | 762 µs  | 531 µs | **1.4x faster** |
-
-Benchmarks on Apple M2 (your results may vary). Run benchmarks yourself:
+Run benchmarks yourself:
 
 ```bash
 deno bench
@@ -231,34 +189,25 @@ optimizations:
 
 ### Stage 1: Character Index (Fast Filtering)
 
-Uses an optimized character-based inverted index that maps each character code
-to items containing it:
+Uses an optimized character-based inverted index to quickly filter candidates.
 
-```
-"apple" → chars: [a, p, l, e] → item indices
-```
-
-Query characters are intersected using a fast O(N+M) sorted-array zipper
-algorithm to find candidate items that contain all query characters.
-
-**Key optimizations:**
-
-- Uses `charCodeAt` for numeric keys (faster than string comparison)
-- Zero-allocation build via monotonic index checking
-- Shortest-list-first intersection strategy
+1. **Indexing**: Maps each unique character to the list of items containing it.
+2. **Filtering**: When searching, it intersects the item lists for characters
+   present in the query.
+3. **Result**: A reduced set of candidate items that contain the necessary
+   characters, significantly reducing the workload for the scoring stage.
 
 ### Stage 2: Distance Scoring (Precise Ranking)
 
-For each candidate, calculate similarity using the selected algorithm (default:
-Smith-Waterman for partial matching).
+For each candidate from Stage 1, calculates the similarity score using the
+selected algorithm (e.g., Levenshtein, Smith-Waterman).
 
 **Optimizations:**
 
-- **Bitap Algorithm**: Uses bit-parallel operations for strings shorter than 32
-  characters, drastically improving speed.
-- **Memory Efficiency**: Reuses calculation buffers and caches intermediate
-  results to minimize garbage collection.
-- **Early Exit**: Perfect matches are detected and returned immediately.
+- **Bitap Algorithm**: Uses bit-parallel operations for fast approximate string
+  matching on short strings.
+- **Early Exit**: Stops calculation early if the score exceeds the threshold.
+- **Memory Efficiency**: Reuses buffers to minimize garbage collection.
 
 Normalized score = `distance / max(query.length, text.length)`
 

@@ -10,6 +10,28 @@ export type AlgorithmType =
   | "hamming";
 
 /**
+ * Configuration for a search strategy.
+ */
+export interface SearchStrategy {
+  /**
+   * Algorithm(s) to use for scoring.
+   */
+  algorithm: AlgorithmType[];
+
+  /**
+   * Strategy for combining scores when multiple algorithms are used.
+   * @default "min"
+   */
+  mode?: "min" | "average";
+
+  /**
+   * Default threshold for this strategy.
+   * @default 0.4
+   */
+  threshold?: number;
+}
+
+/**
  * Configuration options for FuzzySearch constructor.
  */
 export type FuzzySearchOptions<T> = {
@@ -29,7 +51,7 @@ export type FuzzySearchOptions<T> = {
    *
    * Can be a single algorithm or an array of algorithms.
    * When multiple algorithms are specified, each candidate is scored by all algorithms,
-   * and the final score is determined by the `algorithmStrategy`.
+   * and the final score is determined by the `mode`.
    *
    * - "levenshtein": General purpose, good for typos and edits
    * - "damerau-levenshtein": Better for adjacent character swaps (e.g., "teh" vs "the")
@@ -51,7 +73,14 @@ export type FuzzySearchOptions<T> = {
    *
    * @default "min"
    */
-  algorithmStrategy?: "min" | "average";
+  mode?: "min" | "average";
+
+  /**
+   * Pre-configured search strategy to use.
+   * If provided, its settings will be merged with other options.
+   * Explicit options take precedence over strategy settings.
+   */
+  strategy?: SearchStrategy;
 
   /**
    * Optimization options to control performance vs. accuracy trade-offs.
@@ -87,12 +116,12 @@ export type SearchOptions = {
    * @default "levenshtein"
    */
   algorithm?:
-    | "levenshtein"
-    | "damerau-levenshtein"
-    | "smith-waterman"
-    | "jaro-winkler"
-    | "needleman-wunsch"
-    | "hamming";
+  | "levenshtein"
+  | "damerau-levenshtein"
+  | "smith-waterman"
+  | "jaro-winkler"
+  | "needleman-wunsch"
+  | "hamming";
 };
 
 /**
